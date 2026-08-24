@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报备照生成器</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* 通用页面容器（模拟手机屏幕） */
+        .screen {
+            width: 100%;
+            max-width: 400px;
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid #f0f0f0;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            align-items: center;
+        }
+        .screen.active { display: flex; }
+
+        /* 果冻质感按钮（透明立体） */
+        .jelly-btn {
+            width: 100%;
+            height: 60px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.6);
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 
+                inset 0 1px 1px rgba(255,255,255,0.9), 
+                inset 0 -2px 2px rgba(0,0,0,0.05),
+                0 8px 16px rgba(0,0,0,0.08);
+            transition: transform 0.1s ease;
+        }
+        .jelly-btn:active { transform: scale(0.98); }
+        
+        /* 白色果冻按钮 */
+        .btn-white { background: rgba(255, 255, 255, 0.8); color: #333; }
+        
+        /* 高级灰透明果冻按钮 */
+        .btn-grey { background: linear-gradient(145deg, rgba(200,200,200,0.7), rgba(150,150,150,0.7)); color: #222; }
+
+        /* 页面一 */
+        .page1-header { text-align: center; font-size: 26px; font-weight: bold; color: #333; margin-bottom: 50px; }
+        .page1-btn-wrap { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 40vh; width: 100%;}
+
+        /* 页面二、三（灰白色调，集成视频区） */
+        .camera-box { width: 100%; height: 250px; background: #e0e0e0; border-radius: 10px; margin-bottom: 20px; position: relative; overflow: hidden; }
+        .camera-video, .camera-placeholder { width: 100%; height: 100%; object-fit: cover; }
+        .grey-text { color: #555; font-size: 14px; text-align: center; margin: 10px 0; }
+        .slider-grey { width: 100%; accent-color: #999; margin: 15px 0; }
+        
+        .grey-btn { width: 100%; height: 45px; border: 1px solid #ddd; border-radius: 10px; background: #f9f9f9; color: #555; font-size: 15px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .grey-btn:active { background: #eee; }
+
+        .row { display: flex; gap: 10px; width: 100%; }
+        .row .grey-btn { flex: 1; }
+
+        .option-group { margin-bottom: 20px; width: 100%; }
+        .option-label { color: #666; font-size: 14px; margin-bottom: 10px; }
+        
+        .pill-btn { padding: 10px 20px; border: 1px solid #ddd; border-radius: 20px; background: #f4f4f4; color: #444; font-size: 14px; cursor: pointer; display: inline-block; margin-right: 10px; margin-bottom: 10px; }
+        .pill-btn.active { background: #ccc; color: #111; font-weight: bold; }
+
+        .input-grey { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; margin: 10px 0; background: #fff; color: #333; }
+        
+        #filePicker { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- 页面一：首页 -->
+    <div id="page0" class="screen active">
+        <div class="page1-header">拿起手机📸</div>
+        <div class="page1-btn-wrap">
+            <button class="jelly-btn btn-white" onclick="goCamera()">📸 走，开摄像头</button>
+            <button class="jelly-btn btn-grey" onclick="openFilePicker()">🖼️ 相册里挑一张也行</button>
+        </div>
+    </div>
+
+    <!-- 页面二：拍照页（融合了摄像头功能段） -->
+    <div id="page1" class="screen">
+        <div class="camera-box">
+            <video id="video" class="camera-video" autoplay playsinline style="display:none;"></video>
+            <img id="placeholder" class="camera-placeholder" src="https://via.placeholder.com/400x250?text=No+Camera+Permission" alt="占位图">
+        </div>
+        <div class="grey-text">现在 β 67°/γ 38°，目标 β 87°/γ 8°</div>
+        <div class="grey-text">角度容差（大一点更容易触发，默认 ±12°）</div>
+        <input type="range" class="slider-grey">
+        <button class="grey-btn" onclick="manualCapture()">懒得举？手动拍一张</button>
+        <div class="row">
+            <button class="grey-btn" onclick="alert('镜像功能：开')">镜像：开</button>
+            <button class="grey-btn" onclick="alert('切换后置摄像头功能')">换后置</button>
+        </div>
+        <button class="grey-btn" style="margin-top: 10px;" onclick="alert('已重新校准角度')">🔧 重新校准</button>
+        <button class="grey-btn" style="margin-top: 10px;" onclick="switchPage(0)">🔙 返回首页</button>
+    </div>
+
+    <!-- 页面三：编辑页 -->
+    <div id="page2" class="screen">
+        <div class="camera-box">
+            <img id="preview-img" class="camera-placeholder" src="" alt="预览图">
+            <div id="text-box" class="text-box bottom" style="position: absolute; width: 100%; text-align: center; color: #333; background: rgba(255,255,255,0.8); padding: 5px; bottom: 0;">写几个字（不会超出底边）</div>
+        </div>
+
+        <div class="option-group">
+            <div class="option-label">底位置</div>
+            <span class="pill-btn" onclick="changePos('top', this)">上</span><span class="pill-btn active" onclick="changePos('bottom', this)">下</span><span class="pill-btn" onclick="changePos('left', this)">左</span><span class="pill-btn" onclick="changePos('right', this)">右</span><span class="pill-btn" onclick="changePos('none', this)">无</span>
+        </div>
+        
+        <div class="option-group">
+            <div class="option-label">底色</div>
+            <span class="pill-btn active" onclick="changeBg('#fff', this)">白底</span><span class="pill-btn" onclick="changeBg('#000', this)">黑底</span>
+        </div>
+        
+        <input type="text" id="textInput" class="input-grey" placeholder="写几个字（不会超出底边）" oninput="changeText()">
+        
+        <div class="option-group">
+            <div class="option-label">对齐</div>
+            <span class="pill-btn" onclick="changeAlign('left', this)">左</span><span class="pill-btn active" onclick="changeAlign('center', this)">中</span><span class="pill-btn" onclick="changeAlign('right', this)">右</span>
+        </div>
+        
+        <button class="jelly-btn btn-grey" style="color: #fff; margin-top:10px;" onclick="shareWeChat()">📸 甩到微信</button>
+        
+        <div class="row">
+            <button class="grey-btn" onclick="switchPage(1)">🔄 重拍</button>
+            <button class="grey-btn" onclick="saveImage()">🖼️ 存相册</button>
+        </div>
+        
+        <!-- 隐藏的文件上传控件 -->
+        <input type="file" id="filePicker" accept="image/*" onchange="loadFile(event)">
+    </div>
+
+    <script>
+        // 页面切换逻辑
+        function switchPage(pageId) {
+            document.querySelectorAll('.screen').forEach(p => p.classList.remove('active'));
+            document.getElementById('page' + pageId).classList.add('active');
+        }
+
+        // 打开摄像头（需在HTTPS或localhost环境运行才能生效）
+        function goCamera() {
+            switchPage(1);
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                    .then(stream => {
+                        document.getElementById('video').style.display = 'block';
+                        document.getElementById('placeholder').style.display = 'none';
+                        document.getElementById('video').srcObject = stream;
+                    })
+                    .catch(err => {
+                        alert("摄像头无法开启（请在HTTPS或localhost环境下运行），将使用占位图模拟。");
+                    });
+            } else {
+                alert("当前浏览器不支持摄像头API，将使用占位图模拟。");
+            }
+        }
+
+        // 打开相册
+        function openFilePicker() {
+            document.getElementById('filePicker').click();
+        }
+
+        // 读取本地图片并进入编辑页
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview-img').src = e.target.result;
+                    switchPage(2);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 手动拍一张
+        function manualCapture() {
+            document.getElementById('preview-img').src = "https://via.placeholder.com/400x250?text=Captured+Image";
+            switchPage(2);
+        }
+
+        // 更改文字位置
+        function changePos(pos, el) {
+            const box = document.getElementById('text-box');
+            box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.bottom = '';
+            
+            if(pos === 'none') { box.style.display = 'none'; }
+            else {
+                box.style.display = 'block';
+                if (pos === 'top') box.style.top = '0';
+                else if (pos === 'bottom') box.style.bottom = '0';
+                else if (pos === 'left') { box.style.left = '0'; box.style.width = 'auto'; }
+                else if (pos === 'right') { box.style.right = '0'; box.style.width = 'auto'; }
+            }
+            // 高亮切换
+            const opts = el.parentNode.querySelectorAll('span');
+            opts.forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        // 更改背景色
+        function changeBg(color, el) {
+            const box = document.getElementById('text-box');
+            box.style.backgroundColor = color === '#000' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
+            box.style.color = color === '#000' ? '#fff' : '#333';
+            
+            const opts = el.parentNode.querySelectorAll('span');
+            opts.forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        // 更改文字
+        function changeText() {
+            const val = document.getElementById('textInput').value;
+            document.getElementById('text-box').innerText = val || '写几个字（不会超出底边）';
+        }
+
+        // 更改对齐
+        function changeAlign(align, el) {
+            document.getElementById('text-box').style.textAlign = align;
+            const opts = el.parentNode.querySelectorAll('span');
+            opts.forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        // 模拟分享
+        function shareWeChat() {
+            alert("由于浏览器安全限制，无法直接跳转微信。\n请长按上方图片，保存后手动发到微信。");
+        }
+
+        // 模拟保存
+        function saveImage() {
+            alert("图片已模拟保存！");
+        }
+    </script>
+</body>
+</html>
